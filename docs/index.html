@@ -1,0 +1,180 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html>
+	<head>
+		<meta http-equiv="content-type" content="text/html; charset=iso-8859-1">
+		<title>Reversing Engineering using Deep Learning on CAD Models</title>
+
+		<link rel="stylesheet" href="css/style.css" type="text/css" media="screen" title="no title" charset="utf-8"/>
+		<link rel="stylesheet" href="http://yandex.st/highlightjs/8.0/styles/default.min.css">
+		<script src="http://yandex.st/highlightjs/8.0/highlight.min.js"></script>
+		<script>
+			hljs.initHighlightingOnLoad();
+		</script>
+		<script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+		<script id="MathJax-script" async
+          src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+  		</script>
+	</head>
+
+	<body>
+
+		<div id="main">
+			<p>
+				Wallas H. S. Santos
+			</p>
+			<p>
+				IMPA - i3d20
+				July 2020
+			</p>
+			<h1>Reversing Engineering using Deep Learning on CAD Models</h1>
+			
+			
+			<h2>Introduction</h2>
+			
+			<p>
+				On CAD models complex structure can be modeled by combining simple geometry primitives like cubes, cylinders, etc (see Figure 1). 
+				When using this approach, models can be more compact than using generic polygon mesh. 
+				Moreover, systems can explore this feature to improve the rendering pipeline and provide smooth navigation. 
+				However, it is not always possible to have this representation due to the lack of format standardization, obsolete models, bad design, etc.
+			</p>
+			<p>
+				In this work, we propose to address the problem of reverse engineering on CAD models. 
+				The main goal is to use mesh segmentation using deep learning to extract common geometries on such models.
+
+			</p>
+
+			<p class="image-p">
+				<img src="images/cad.png" />
+                
+				Figure 1. Left: An original rendered image from a CAD model of a Refinery. 
+				Right: The same scene but geometries of the same are using the same colormap.</a>.
+			</p>
+
+			
+			<h2>Feature-Steered Graph Convolutions</h2>
+			
+			<p>
+				The 2D convolution operation has been successfully used to extract local features on images to solve different problems of computer vision. 
+				Its construction is simple due to the structure of the image where the pixels are arranged in a regular grid. 
+				However, for other types of data structures, an analogous approach is not straightforward, for instance, on polygon meshes, 
+				extract features based on their vertices is challenging since they can have a variety of degrees. In this context, 
+				the feature-steered graph convolution was proposed to fill this gap <a href="#ref-1">[1]</a>. 
+			</p>
+
+			<p>
+				Let \(x\) a input feature and \( y \) an output feature to vertex, where \(D\) and \(E\) are input feature space and output feature space, 
+				\( x \in \rm I\!R^D \) and \( y \in \rm I\!R^E \); \(M\) a set of weight matrices, where \(W_m  \in \rm I\!R^{D \times E} \)';
+				and \(\mathcal{N}\) the set of neighbors of vertex \(i\),
+				the following equation give us the output feature for the vertex \(i\):
+			</p>
+			
+			<p class="eq-center">
+				\( y_i = b + \sum_{m=1}^{M}{\frac{1}{|\mathcal{N}_i|}} \sum_{j \in \mathcal{N}_i}{q_m(x_i, x_j)W_m x_j} \)
+			</p>
+
+			<p>
+				The term \(q_m(x_i, x_j)\) is a soft-assignment over a linear transformation of the neighbor \(j\) for a \(m\) weight matrix.
+				The assignment is given by: 
+			</p>
+
+			<p class="eq-center">
+				\( 	q_m(x_i, x_j) \propto exp (u^\top_m x_i + v^\top_m x_j + c_m) \),
+			</p>
+
+			<p>
+				where \(u^\top_m \), \(v^\top_m\),  and \(c_m\) are parameters of the linear transformation. To make the operation translation invariant, 
+				we can set \( 	u_m  = - v_m \), therefore we get:
+			</p>
+
+			<p class="eq-center">
+				\( 	q_m(x_i, x_j) \propto exp (u^\top_m (x_j - x_i) + c_m) \)
+			</p>
+
+			<p class="image-p">
+				<img src="images/graph_convolution.png" />
+                <br />
+                Figure 2. Graph convolution illustration <a href="#ref-1">[1]</a>.
+			</p>
+
+			<h2>Implementation</h2>
+
+			We implemented the proof of concept using tensorflow-graphics based on the Colab <a href="#ref2">[2]</a>. Figure 3 depicts the architecture,
+			we use the same in our implementation with only changing the number of output classes. The source code available in <a href="#ref-3">[3]</a>.
+
+			<p class="image-p">
+				<img src="images/architecture.png" />
+                <br />
+                Figure 3. Neural network architecture for mesh segmentation of human body parts.<a href="#ref-2">[2]</a>.
+			</p>
+
+			<p>
+				We trained the neural network to classify the following classes:
+			</p>
+
+			<li>Boxes</li>
+			<li>Cones</li>
+			<li>Cylinders</li>
+			<li>Torus</li>
+
+			<h3>Dataset</h3>
+
+			We built a dataset with the target geometries. 
+			We generated a set of labeled meshes into a single sample as <a href="https://www.tensorflow.org/api_docs/python/tf/train/Example" target="_blank">tf.Example</a>, 
+			and stored those examples into a <a href="https://www.tensorflow.org/api_docs/python/tf/data/TFRecordDataset" target="_blank">tf.data.TFRecordDataset</a>.  
+			It is important to balance the dataset, since for each type of geometry, 
+			the number of vertices can vary, and the evaluation can be biased by the geometry 
+			type with more vertices in the sample. For instance, a torus needs more vertices than a cube. 
+			Therefore, for each example, we added more geometries with fewer vertices to balance the example.
+
+			<p class="image-p">
+				<img src="images/sample.png" />
+                <br />
+                Figure 4. A sample from the dataset. Cubes are blue, cylinders are red, cones are yellow and the torus is green. Note the different amounts of geometries to balance the number of vertices. The geometries were horizontally aligned for better visualization.<a href="#ref-2">[2]</a>.
+			</p>
+
+			<h3>Results</h3>
+
+			<p>
+			In the training phase, the moded achieved 100% accuracy for 30000 
+			samples for training and 500 samples for testing. 
+			However, this good result due to the training set is not exhaustive and may fail in other scenarios. 
+			</p>
+
+			<p>
+			Finally, we tested the model with a few samples of the PowerPlant Dataset <a href="#ref-3">[3]</a>, which is a model that contains modeling features that we are interested in this work. The geometries of the model are stored as PLY files. 
+			</p>
+			
+			<p>
+				Figure 5. shows the results on the samples of the PowerPlant. 
+				<span class="bold">Important Note:</span> The model segmentation is not applied to the polygon mesh directly. 
+				We split the mesh using face connectivity, transform to the origin and scale each part to a "safe" 
+				size (that we found experimentally, based on the scale of the dataset in <a href="#ref-2">[2]</a>). 
+				Then the model is applied elementwise, however, the output is per vertex. 
+				This limitation is due to a possible bug in the current implementation of Feature-Steered 
+				Graph Convolutions in tensorgraphics. During the development, 
+				the convolutions in the meshes were generating NaN (not a number) values when the triangles 
+				have arbitrary translations and sizes. 
+			</p>
+
+
+			<p class="image-p">
+				<img src="images/s0.png" />
+				<img src="images/s1.png" />
+				<img src="images/s2.png" />
+				<img src="images/s3.png" />
+                <br />
+                Figure 5. Results of the segmentation applied on the PowerPlant Dataset<a href="#ref-3"> [3]</a>.
+			</p>
+
+			<h2 id="source">Source Code</h2>            
+			<p ><a target="_blank" href="https://github.com/wallashss/cad_reverse_engineering_dl">[Github Repository]</a></p> 
+			
+			<h2>References</h2>
+            
+			<p id="ref-1">[1] Verma, Nitika, Edmond Boyer, and Jakob Verbeek. "Feastnet: Feature-steered graph convolutions for 3d shape analysis." Proceedings of the IEEE conference on computer vision and pattern recognition. 2018.<a target="_blank" href="https://arxiv.org/abs/1706.05206" target="_blank">[Link]</a></p>
+			<p id="ref-2">[2] Mesh Segmentation Colab <a target="_blank" href="https://colab.research.google.com/github/tensorflow/graphics/blob/master/tensorflow_graphics/notebooks/mesh_segmentation_demo.ipynb#scrollTo=t4v1coMcWtiJ" target="_blank">[Link]</a></p>
+			<p id="ref-3">[3] PowerPlant Dataset <a target="_blank" href="https://gamma.cs.unc.edu/POWERPLANT/">[Link]</a></p>
+		</div>
+	</body>
+</html>
