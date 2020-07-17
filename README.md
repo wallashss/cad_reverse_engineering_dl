@@ -1,5 +1,5 @@
 # Reversing Engineering using Deep Learning on CAD Models
-Implementation of the project for IMPA course Design and Implementation of 3D Graphics Systems 2020
+Implementation of the final project for the IMPA course Design and Implementation of 3D Graphics Systems 2020
 
 
 In this work, we propose to address the problem of reverse engineering on CAD models. The main goal is to use mesh segmentation using deep learning to extract common geometries on such models.
