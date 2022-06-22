@@ -1,4 +1,4 @@
 tensorflow-graphics==2020.5.20
 trimesh==3.6.38
-numpy==1.18.4
+numpy==1.22.0
 pyglet==1.5.5
